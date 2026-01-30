@@ -23,10 +23,13 @@ services:
       - "127.0.0.1:3307:3306"
     volumes:
       - mysql_data:/var/lib/mysql
-      - ./docker/mysql/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    # 這裡將頂層定義的 config 掛載進去，並命名為 init.sh
+    configs:
+      - source: mysql_init_script
+        target: /docker-entrypoint-initdb.d/init.sh
     networks:
       temporal-network:
-        ipv4_address: 172.28.0.2  # 固定 MySQL 在 .2
+        ipv4_address: 172.28.0.2
 
   # Temporal Server
   temporal:
@@ -43,7 +46,7 @@ services:
       - temporal-mysql
     networks:
       temporal-network:
-        ipv4_address: 172.28.0.3  # 固定 Temporal 在 .3
+        ipv4_address: 172.28.0.3
 
   # Temporal Web UI
   temporal-ui:
@@ -52,7 +55,6 @@ services:
     ports:
       - "8888:8080"
     environment:
-      # 這裡的 "temporal" 必須是你在 docker-compose 裡面定義 server 的那個 service 名稱
       - TEMPORAL_GRPC_ENDPOINT=temporal:7233 
       - TEMPORAL_ADDRESS=temporal:7233
     depends_on:
@@ -61,7 +63,19 @@ services:
       temporal-network:
         ipv4_address: 172.28.0.5
 
-# --- 關鍵：定義固定網段 ---
+# --- 關鍵：定義 Configs 內容 ---
+configs:
+  mysql_init_script:
+    content: |
+      #!/bin/bash
+      # 使用 heredoc 將帶有變數的 SQL 語法餵給 mysql 指令
+      mysql -u root -p"$$MYSQL_ROOT_PASSWORD" <<-EOSQL
+        CREATE USER IF NOT EXISTS '$$MYSQL_USER'@'172.28.%.%' IDENTIFIED BY '$$MYSQL_PASSWORD';
+        GRANT ALL PRIVILEGES ON temporal.* TO '$$MYSQL_USER'@'172.28.%.%';
+        GRANT ALL PRIVILEGES ON temporal_visibility.* TO '$$MYSQL_USER'@'172.28.%.%';
+        FLUSH PRIVILEGES;
+      EOSQL
+
 networks:
   temporal-network:
     driver: bridge
