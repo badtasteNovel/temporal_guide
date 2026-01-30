@@ -18,3 +18,14 @@ composer require spiral/roadrunner
 
 # 記得填寫env數值
 ![alt text](image-1.png)
+
+# 在appserviceprovider.php
+```php
+$this->app->singleton(WorkflowClientInterface::class, function ($app) {
+            // 連接到你 Docker 裡的 Server
+            $serviceClient = ServiceClient::create(config('temporal.host').':'.config('temporal.port'));
+            return WorkflowClient::create($serviceClient);
+        });
+```
+temporal.host 預設為localhost
+temporal.port 根據docker配置預設為7233
